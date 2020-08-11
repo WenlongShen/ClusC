@@ -2,8 +2,12 @@
 # coding: utf-8
 
 from clusc.utils import *
+import os
 
-from sklearn.cluster import KMeans
+import numpy as np
+import tensorflow as tf
+import scipy.sparse as sp
+
 
 flags = tf.app.flags
 FLAGS = flags.FLAGS
@@ -403,3 +407,97 @@ class OptimizerVAE(object):
 
 		self.opt_op = self.optimizer.minimize(self.cost)
 		self.grads_vars = self.optimizer.compute_gradients(self.cost)
+
+
+def update(model, opt, sess, adj_norm, adj_label, features, placeholders, adj):
+	# Construct feed dictionary
+	feed_dict = construct_feed_dict(adj_norm, adj_label, features, placeholders)
+	feed_dict.update({placeholders['dropout']: FLAGS.dropout})
+
+	feed_dict.update({placeholders['dropout']: 0})
+	emb = sess.run(model.z_mean, feed_dict=feed_dict)
+
+	z_real_dist = np.random.randn(adj.shape[0], FLAGS.hidden2)
+	feed_dict.update({placeholders['real_distribution']: z_real_dist})
+
+	for j in range(5):
+		_, reconstruct_loss = sess.run([opt.opt_op, opt.cost], feed_dict=feed_dict)
+	d_loss, _ = sess.run([opt.dc_loss, opt.discriminator_optimizer], feed_dict=feed_dict)
+	g_loss, _ = sess.run([opt.generator_loss, opt.generator_optimizer], feed_dict=feed_dict)
+
+	avg_cost = reconstruct_loss
+
+	return emb, avg_cost
+
+
+def get_placeholder(adj):
+	placeholders = {
+		'features': tf.sparse_placeholder(tf.float32),
+		'adj': tf.sparse_placeholder(tf.float32),
+		'adj_orig': tf.sparse_placeholder(tf.float32),
+		'dropout': tf.placeholder_with_default(0., shape=()),
+		'real_distribution': tf.placeholder(dtype=tf.float32, shape=[adj.shape[0], FLAGS.hidden2],
+											name='real_distribution')
+
+	}
+
+	return placeholders
+
+
+def get_model(model_str, placeholders, num_features, num_nodes, features_nonzero):
+	discriminator = Discriminator()
+	d_real = discriminator.construct(placeholders['real_distribution'])
+	model = None
+	if model_str == 'arga_ae':
+		model = ARGA(placeholders, num_features, features_nonzero)
+
+	elif model_str == 'arga_vae':
+		model = ARVGA(placeholders, num_features, num_nodes, features_nonzero)
+
+	return d_real, discriminator, model
+
+
+def get_optimizer(model_str, model, discriminator, placeholders, pos_weight, norm, d_real,num_nodes):
+	if model_str == 'arga_ae':
+		d_fake = discriminator.construct(model.embeddings, reuse=True)
+		opt = OptimizerAE(preds=model.reconstructions,
+						  labels=tf.reshape(tf.sparse_tensor_to_dense(placeholders['adj_orig'],
+																	  validate_indices=False), [-1]),
+						  pos_weight=pos_weight,
+						  norm=norm,
+						  d_real=d_real,
+						  d_fake=d_fake)
+	elif model_str == 'arga_vae':
+		opt = OptimizerVAE(preds=model.reconstructions,
+						   labels=tf.reshape(tf.sparse_tensor_to_dense(placeholders['adj_orig'],
+																	   validate_indices=False), [-1]),
+						   model=model, num_nodes=num_nodes,
+						   pos_weight=pos_weight,
+						   norm=norm,
+						   d_real=d_real,
+						   d_fake=discriminator.construct(model.embeddings, reuse=True))
+	return opt
+
+
+def sparse_to_tuple(sparse_mx):
+	if not sp.isspmatrix_coo(sparse_mx):
+		sparse_mx = sparse_mx.tocoo()
+	coords = np.vstack((sparse_mx.row, sparse_mx.col)).transpose()
+	values = sparse_mx.data
+	shape = sparse_mx.shape
+	return coords, values, shape
+
+def preprocess_graph(adj):
+	adj = sp.coo_matrix(adj)
+	rowsum = np.array(adj.sum(1))
+	degree_mat_inv_sqrt = sp.diags(np.power(rowsum, -0.5).flatten())
+	adj_normalized = adj.dot(degree_mat_inv_sqrt).transpose().dot(degree_mat_inv_sqrt).tocoo()
+	return sparse_to_tuple(adj_normalized)
+
+def construct_feed_dict(adj_normalized, adj, features, placeholders):
+	# construct feed dictionary
+	feed_dict = dict()
+	feed_dict.update({placeholders['features']: features})
+	feed_dict.update({placeholders['adj']: adj_normalized})
+	feed_dict.update({placeholders['adj_orig']: adj})
+	return feed_dict
