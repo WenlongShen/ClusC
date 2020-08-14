@@ -5,7 +5,6 @@ from clusc.utils import *
 from clusc.arga import *
 
 import cooler
-
 import pandas as pd
 import numpy as np
 import scipy.sparse as sp
@@ -200,7 +199,6 @@ def preprocess_feat(infile_name, outfile_name, loci_pd, feat_type=None, **kwargs
 		raise Exception("Invalid feat type... We only accepted category(cat) right now...")
 
 	return
-
 
 
 def noramlization_hic(hic_net, threshold=0.05):

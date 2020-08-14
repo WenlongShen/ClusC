@@ -108,8 +108,6 @@ class ARGA(Model):
 										  logging=self.logging)(self.embeddings)
 
 
-
-
 class ARVGA(Model):
 	def __init__(self, placeholders, num_features, num_nodes, features_nonzero, **kwargs):
 		super(ARVGA, self).__init__(**kwargs)
@@ -193,7 +191,8 @@ class Discriminator(Model):
 			dc_den2 = tf.nn.relu(dense(dc_den1, FLAGS.hidden3, FLAGS.hidden1, name='dc_den2'))
 			output = dense(dc_den2, FLAGS.hidden1, 1, name='dc_output')
 			return output
-			
+		
+
 def gaussian_noise_layer(input_layer, std):
 	noise = tf.random_normal(shape=tf.shape(input_layer), mean=0.0, stddev=std, dtype=tf.float32)
 	return input_layer + noise
@@ -320,6 +319,7 @@ class InnerProductDecoder(Layer):
 		outputs = self.act(x)
 		return outputs
 
+
 class OptimizerAE(object):
 	def __init__(self, preds, labels, pos_weight, norm, d_real, d_fake):
 		preds_sub = preds
@@ -349,15 +349,12 @@ class OptimizerAE(object):
 		dc_var = [var for var in all_variables if 'dc_' in var.name]
 		en_var = [var for var in all_variables if 'e_' in var.name]
 
-	  
 		with tf.variable_scope(tf.get_variable_scope()):
 			self.discriminator_optimizer = tf.train.AdamOptimizer(learning_rate=FLAGS.discriminator_learning_rate,
 															 beta1=0.9, name='adam1').minimize(self.dc_loss, var_list=dc_var) #minimize(dc_loss_real, var_list=dc_var)
 
 			self.generator_optimizer = tf.train.AdamOptimizer(learning_rate=FLAGS.discriminator_learning_rate,
 														 beta1=0.9, name='adam2').minimize(self.generator_loss, var_list=en_var)
-
-
 
 		self.opt_op = self.optimizer.minimize(self.cost)
 		self.grads_vars = self.optimizer.compute_gradients(self.cost)
@@ -386,7 +383,6 @@ class OptimizerVAE(object):
 		all_variables = tf.trainable_variables()
 		dc_var = [var for var in all_variables if 'dc_' in var.op.name]
 		en_var = [var for var in all_variables if 'e_' in var.op.name]
-
 
 		with tf.variable_scope(tf.get_variable_scope(), reuse=False):
 			self.discriminator_optimizer = tf.train.AdamOptimizer(learning_rate=FLAGS.discriminator_learning_rate,
@@ -438,7 +434,6 @@ def get_placeholder(adj):
 		'dropout': tf.placeholder_with_default(0., shape=()),
 		'real_distribution': tf.placeholder(dtype=tf.float32, shape=[adj.shape[0], FLAGS.hidden2],
 											name='real_distribution')
-
 	}
 
 	return placeholders
@@ -487,12 +482,14 @@ def sparse_to_tuple(sparse_mx):
 	shape = sparse_mx.shape
 	return coords, values, shape
 
+
 def preprocess_graph(adj):
 	adj = sp.coo_matrix(adj)
 	rowsum = np.array(adj.sum(1))
 	degree_mat_inv_sqrt = sp.diags(np.power(rowsum, -0.5).flatten())
 	adj_normalized = adj.dot(degree_mat_inv_sqrt).transpose().dot(degree_mat_inv_sqrt).tocoo()
 	return sparse_to_tuple(adj_normalized)
+
 
 def construct_feed_dict(adj_normalized, adj, features, placeholders):
 	# construct feed dictionary
@@ -501,3 +498,4 @@ def construct_feed_dict(adj_normalized, adj, features, placeholders):
 	feed_dict.update({placeholders['adj']: adj_normalized})
 	feed_dict.update({placeholders['adj_orig']: adj})
 	return feed_dict
+
