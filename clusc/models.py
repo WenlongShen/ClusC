@@ -9,13 +9,12 @@ from sklearn.cluster import KMeans
 
 def clustering(emb, n_clusters, ids, **kwargs):
 	kmeans = KMeans(n_clusters, random_state=seed).fit(emb)
-	predict_labels = kmeans.predict(emb)
+	predict_labels = kmeans.predict(emb)+1
 	result_pd = pd.DataFrame(data={"ID":ids, "cluster":predict_labels})
 	return result_pd
 
 
 def embedding(data, n_clusters, algorithm="arga", **kwargs):
-
 	if algorithm == "arga":
 		model = kwargs.get("model")
 		epochs = kwargs.get("epochs")

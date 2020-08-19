@@ -33,3 +33,12 @@ def eliminate_to_zeros(data, threshold=0.05):
 	data[data<threshold] = 0
 	return data
 
+
+def str_to_pos(string_id):
+	"""
+	chrom:start-end
+	"""
+	arr1 = string_id.split(":")
+	arr2 = arr1[1].split("-")
+	return arr1[0],arr2[0],arr2[1]
+

@@ -208,4 +208,21 @@ def noramlization_hic(hic_net, threshold=0.05):
 	hic_net = eliminate_to_zeros(hic_net, threshold)
 	return sp.coo_matrix(hic_net)
 
-	
+
+def clusters_to_bed(clusters_pd, outfile_name):
+	outfile = open(outfile_name, "w")
+	for index, row in clusters_pd.iterrows():
+		outfile.write("%s\t%s\t%s\t%s\t%s\t%s\n" % (str_to_pos(row['ID'])+(row['ID'],row['cluster'],".")))
+
+
+def clusters_to_links(clusters_pd, hic_net, outfile_name):
+	outfile = open(outfile_name, "w")
+	hic_net = hic_net.toarray()
+	for index_i, row_i in clusters_pd.iterrows():
+		for index_j, row_j in clusters_pd.iterrows():
+			if index_i != index_j \
+				and row_i['cluster'] == row_j['cluster'] \
+				and hic_net[index_i][index_j] != 0:
+
+				outfile.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (str_to_pos(row_i['ID'])+str_to_pos(row_j['ID'])+(row_i['cluster'],)))
+
