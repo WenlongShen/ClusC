@@ -22,10 +22,15 @@ def noramlization(data):
 	min_val = data.min()
 	max_val = data.max()
 	ranges = max_val - min_val
-	norm_data = np.zeros(np.shape(data))
-	m, n = data.shape[0], data.shape[1]
-	norm_data = data - np.tile(min_val, (m, n))
-	norm_data = norm_data / np.tile(ranges, (m, n))
+	norm_data = np.zeros(data.shape)
+	norm_data = data - np.tile(min_val, data.shape)
+	norm_data = norm_data / np.tile(ranges, data.shape)
+	return norm_data
+
+
+def noramlization_0(data):
+	ranges = abs(data).max()
+	norm_data = data / np.tile(ranges, data.shape)
 	return norm_data
 
 

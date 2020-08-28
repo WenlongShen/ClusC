@@ -7,6 +7,8 @@ import pygenometracks.tracks as pygtk
 import matplotlib.pyplot as plt
 import matplotlib.colors as mc
 import matplotlib.cm as mcm
+from matplotlib.path import Path
+from matplotlib.patches import PathPatch
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 
@@ -195,6 +197,56 @@ def plotting_circos(circos_configs, outfig_name, **kwargs):
 			width=(row['theta_end']-row['theta_start']),
 			bottom=circos_configs[0].get('radius', 0.9)*max(figsize))
 
+	if circos_configs[0].get('cytobands_file') != None:
+		tmp_pd = pd.read_csv(circos_configs[0].get('cytobands_file'), sep="\t", names=['chrom','start','end','name','gieStain'])
+		cyto_colors = {"gneg":"#FFFFFF","gpos25":"#E5E5E5","gpos50":"#B3B3B3","gpos75":"#666666",
+						"gpos100":"#000000","gvar":"#FFFFFF","stalk":"#CD3333","acen":"#8B2323"}
+		for index, row in tmp_pd.iterrows():
+			valid,ts,te = get_theta(chrom_regions, row, len_per_theta)
+			if not valid:
+				continue
+			ax.bar((ts+te)/2,
+				circos_configs[0].get('width', 1),
+				color=cyto_colors[row['gieStain']],
+				alpha=0.3,
+				width=(te-ts),
+				bottom=circos_configs[0].get('radius', 0.9)*max(figsize))
+
+	if circos_configs[0].get('label', True):
+		for index, row in chrom_regions.iterrows():
+			rotation = get_label_rotation((row['theta_start']+row['theta_end'])/2)
+			ax.text(s=row['chrom'],
+				x=(row['theta_start']+row['theta_end'])/2,
+				y=circos_configs[0].get('radius', 0.9)*max(figsize)*1.15,
+				#fontsize=10,
+				rotation=rotation,
+				ha='center',
+				va='center')
+
+	if circos_configs[0].get('tick_unit', 0) != 0:
+		for index, row in chrom_regions.iterrows():
+			ticks = get_ticks(row, circos_configs[0].get('tick_unit', 0))
+			ticks_et = row['theta_start']-(ticks-row['start'])/len_per_theta
+			radius = circos_configs[0].get('radius', 0.9)*max(figsize)
+			ax.vlines(ticks_et,
+				[radius]*len(ticks_et),
+				[radius-circos_configs[0].get('tick_length', 0.1)]*len(ticks_et))
+
+			if circos_configs[0].get('tick_label') != None:
+				tick_label = circos_configs[0].get('tick_label')
+				labels = {"":1,"K":1000,"M":1000000,"G":1000000000}
+
+				for i,tick in enumerate(ticks): 
+					label = "{0:.3f}{1}".format(tick/labels[tick_label], tick_label)
+					rotation = get_label_rotation(ticks_et[i])
+					ax.text(s=label,
+						x=ticks_et[i],
+						y=radius-circos_configs[0].get('tick_length', 0.1)-circos_configs[0].get('width', 1)-0.2,
+						#fontsize=10,
+						rotation=rotation,
+						ha='center',
+						va='center')
+
 	for i in range(1, len(circos_configs)):
 		if circos_configs[i].get('type') == 'highlight':
 			tmp_pd = pd.read_csv(circos_configs[i].get('file'), sep="\t", names=['chrom','start','end','name','score','strand'])
@@ -217,6 +269,69 @@ def plotting_circos(circos_configs, outfig_name, **kwargs):
 					color=bar_color,
 					width=(te-ts),
 					bottom=circos_configs[i].get('radius', 0.9)*max(figsize))
+
+		if circos_configs[i].get('type') == 'bar':
+			tmp_pd = pd.read_csv(circos_configs[i].get('file'), sep="\t", names=['chrom','start','end','name','score','strand'])
+			tmp_pd['score'] = noramlization_0(tmp_pd['score'])
+			
+			color,colormap,colorlist = get_colorlist(circos_configs[0].get('color'), 0, chrom_regions.shape[0]-1)
+			for index, row in chrom_regions.iterrows():
+				if color != None:
+					chrom_color = color[index%len(color)]
+				else:
+					chrom_color = colorlist.to_rgba(index)
+				ax.bar((row['theta_start']+row['theta_end'])/2,
+					0.01,
+					color=chrom_color,
+					width=(row['theta_end']-row['theta_start']),
+					bottom=circos_configs[i].get('radius', 0.6)*max(figsize))
+
+			color,colormap,colorlist = get_colorlist(circos_configs[i].get('color'), -1, 1)
+			for index, row in tmp_pd.iterrows():
+				valid,ts,te = get_theta(chrom_regions, row, len_per_theta)
+				if not valid:
+					continue
+				if color != None:
+					bar_color = color[0]
+				else:
+					bar_color = colorlist.to_rgba(row['score'])
+
+				ax.bar((ts+te)/2,
+					circos_configs[i].get('width', 1)*row['score'],
+					color=bar_color,
+					width=(te-ts),
+					bottom=circos_configs[i].get('radius', 0.6)*max(figsize))
+
+		if circos_configs[i].get('type') == 'link':
+			tmp_pd = pd.read_csv(circos_configs[i].get('file'), sep="\t", names=['chrom1','start1','end1','chrom2','start2','end2','score'])
+			tmp_pd['score'] = noramlization_0(tmp_pd['score'])
+			
+			color,colormap,colorlist = get_colorlist(circos_configs[0].get('color'), 0, chrom_regions.shape[0]-1)
+			for index, row in chrom_regions.iterrows():
+				if color != None:
+					chrom_color = color[index%len(color)]
+				else:
+					chrom_color = colorlist.to_rgba(index)
+
+
+
+			ets = self.get_theta(gids,starts)
+			        ete = self.get_theta(gids,ends)
+			        points = [(ets[0],rad), # start1
+			                  ((ets[0]+ete[0])/2,rad), # through point
+			                  (ete[0],rad), # end 1
+			                  (0,0), # through point
+			                  (ets[1],rad), # start2
+			                  ((ets[1]+ete[1])/2,rad), # through point
+			                  (ete[1],rad), # end2 
+			                  (0,0), # through point
+			                  (ets[0],rad)]
+			        # parse patches
+			        codes = [Path.CURVE3]*len(points)
+			        codes[0] = Path.MOVETO
+			        path = Path(points, codes)
+			        patch = PathPatch(path, facecolor=color, lw=0.2,alpha=alpha)
+			        self.pax.add_patch(patch)
 
 
 	plt.savefig(outfig_name)
@@ -290,3 +405,23 @@ def get_theta(chrom_pd, regions_pd, len_per_theta):
 		te = chrom_pd.loc[chromID, 'theta_start']-(regions_pd['end']-chrom_pd.loc[chromID, 'start'])/len_per_theta
 		return True,ts,te
 	
+
+def get_label_rotation(rad):
+	rotation = np.rad2deg(rad)
+	if rotation < -90:
+		rotation += 180
+	return rotation
+
+
+def get_ticks(chrom_pd, unit):
+	ts,te = 0,0
+	if chrom_pd['start']%unit == 0:
+		ts = chrom_pd['start']
+	else:
+		ts = chrom_pd['start'] - chrom_pd['start']%unit + unit
+	if chrom_pd['end']%unit == 0:
+		te = chrom_pd['end']
+	else:
+		te = chrom_pd['end'] - chrom_pd['end']%unit
+	return np.arange(ts,te+1,unit)
+
