@@ -304,35 +304,36 @@ def plotting_circos(circos_configs, outfig_name, **kwargs):
 
 		if circos_configs[i].get('type') == 'link':
 			tmp_pd = pd.read_csv(circos_configs[i].get('file'), sep="\t", names=['chrom1','start1','end1','chrom2','start2','end2','score'])
-			tmp_pd['score'] = noramlization_0(tmp_pd['score'])
-			
-			color,colormap,colorlist = get_colorlist(circos_configs[0].get('color'), 0, chrom_regions.shape[0]-1)
-			for index, row in chrom_regions.iterrows():
+			vmin = tmp_pd['score'].min()
+			vmax = tmp_pd['score'].max()
+
+			color,colormap,colorlist = get_colorlist(circos_configs[i].get('color'), vmin, vmax)
+
+			for index, row in tmp_pd.iterrows():
+				tmp_pd_1 = row.loc[['chrom1','start1','end1']].rename({'chrom1':'chrom','start1':'start','end1':'end'})
+				tmp_pd_2 = row.loc[['chrom2','start2','end2']].rename({'chrom2':'chrom','start2':'start','end2':'end'})
+
+				valid1,ts1,te1 = get_theta(chrom_regions, tmp_pd_1, len_per_theta)
+				valid2,ts2,te2 = get_theta(chrom_regions, tmp_pd_2, len_per_theta)
+
+				if not valid1 or not valid2:
+					continue
 				if color != None:
-					chrom_color = color[index%len(color)]
+					link_color = color[(int(row['score'])-vmin)%len(color)]
 				else:
-					chrom_color = colorlist.to_rgba(index)
+					link_color = colorlist.to_rgba(row['score'])
 
-
-
-			ets = self.get_theta(gids,starts)
-			        ete = self.get_theta(gids,ends)
-			        points = [(ets[0],rad), # start1
-			                  ((ets[0]+ete[0])/2,rad), # through point
-			                  (ete[0],rad), # end 1
-			                  (0,0), # through point
-			                  (ets[1],rad), # start2
-			                  ((ets[1]+ete[1])/2,rad), # through point
-			                  (ete[1],rad), # end2 
-			                  (0,0), # through point
-			                  (ets[0],rad)]
-			        # parse patches
-			        codes = [Path.CURVE3]*len(points)
-			        codes[0] = Path.MOVETO
-			        path = Path(points, codes)
-			        patch = PathPatch(path, facecolor=color, lw=0.2,alpha=alpha)
-			        self.pax.add_patch(patch)
-
+				radius = circos_configs[i].get('radius', 0.5)*max(figsize)
+				points = [(ts1,radius), ((ts1+te1)/2,radius), (te1,radius),# start1, through point, end1
+							(0,0),
+							(ts2,radius), ((ts2+te2)/2,radius), (te2,radius),# start2, through point, end2
+							(0,0),
+							(ts1,radius)]
+				codes = [Path.CURVE3]*len(points)
+				codes[0] = Path.MOVETO
+				path = Path(points, codes)
+				patch = PathPatch(path, facecolor=link_color, edgecolor=link_color)
+				ax.add_patch(patch)
 
 	plt.savefig(outfig_name)
 
