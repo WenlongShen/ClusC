@@ -140,8 +140,8 @@ def preprocess_hic(infile_name, outfile_name, loci_pd, infile_type=None):
 
 	for index_i, row_i in loci_pd.iterrows():
 		for index_j, row_j in loci_pd.iterrows():
-			val = hic_data.matrix(balance=True, sparse=True).fetch((row_i["chrom"],row_i["start"],row_i["end"]), \
-				(row_j["chrom"],row_j["start"],row_j["end"])).toarray()[0][0]
+			val = hic_data.matrix(balance=True, sparse=True).fetch((row_i["chrom"],(row_i["start"]+row_i["end"])/2,(row_i["start"]+row_i["end"])/2+1), \
+					(row_j["chrom"],(row_j["start"]+row_j["end"])/2,(row_j["start"]+row_j["end"])/2+1)).toarray()[0][0]
 			if np.isnan(val):
 				val = 0
 
@@ -149,6 +149,25 @@ def preprocess_hic(infile_name, outfile_name, loci_pd, infile_type=None):
 			outfile.write("{}\t{}\t{}\n".format(index_i, index_j, val))
 
 	return sp.coo_matrix(hic_net)
+
+
+def get_hic_matrix(infile_name, chr_region, infile_type=None):
+	"""
+	chrom,start,end = chr_region
+	should be a tuple
+	"""
+	if infile_type is None:
+		infile_type = infile_name.split(".")[-1]
+
+	if infile_type == "cool":
+		hic_data = cooler.Cooler(infile_name)
+		hic_matrix = hic_data.matrix(balance=True, sparse=True).fetch(chr_region).toarray()
+		hic_matrix[np.isnan(hic_matrix)] = 0
+
+	else:
+		raise Exception("Invalid file type... We only accepted cool format for Hi-C file right now...")
+
+	return hic_matrix
 
 
 def preprocess_feat(infile_name, outfile_name, loci_pd, feat_type=None, **kwargs):

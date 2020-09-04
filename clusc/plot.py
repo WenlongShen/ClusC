@@ -11,6 +11,7 @@ from matplotlib.path import Path
 from matplotlib.patches import PathPatch
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
+import itertools
 
 default_colormap = 'gist_rainbow'
 
@@ -32,9 +33,9 @@ def plotting_tracks(region, track_configs, outfig_name, **kwargs):
 		infile_type = track_configs[i]['file'].split(".")[-1]
 
 		if infile_type == 'cool':
-			if track_configs[i].get('section_name') == None:
+			if track_configs[i].get('section_name') is None:
 				track_configs[i]['section_name'] = 'HiC'
-			if track_configs[i].get('region') == None:
+			if track_configs[i].get('region') is None:
 				track_configs[i]['region'] = "{}:{}-{}".format(region[0], region[1], region[2])
 
 			tk = pygtk.HiCMatrixTrack(track_configs[i])
@@ -51,19 +52,19 @@ def plotting_tracks(region, track_configs, outfig_name, **kwargs):
 			cobar = fig.colorbar(tk.img, ax=ax, cax=axins)
 			cobar.ax.yaxis.set_ticks_position('left')
 
-			if tk.properties.get('title') != None:
+			if tk.properties.get('title') is not None:
 				draw_track_title(ax, tk.properties['title'])
 
 		if infile_type == 'arcs' or infile_type == 'links':
-			if track_configs[i].get('section_name') == None:
+			if track_configs[i].get('section_name') is None:
 				track_configs[i]['section_name'] = 'Links'
 			elif track_configs[i].get('section_name') == 'clusters':
 
-				if track_configs[i].get('color') == None \
+				if track_configs[i].get('color') is None \
 					or not is_colormap(track_configs[i].get('color')):
 					track_configs[i]['color'] = default_colormap
 
-				if track_configs[i].get('clusters') == None:
+				if track_configs[i].get('clusters') is None:
 					tmp_pd = pd.read_csv(track_configs[i].get('file'), sep="\t", header=None)
 					track_configs[i]['min_value'] = 1
 					track_configs[i]['max_value'] = tmp_pd.iloc[:,6].max()
@@ -92,38 +93,38 @@ def plotting_tracks(region, track_configs, outfig_name, **kwargs):
 				cobar = fig.colorbar(tk.colormap, ax=ax, cax=axins)
 			cobar.ax.yaxis.set_ticks_position('left')
 
-			if tk.properties.get('title') != None:
+			if tk.properties.get('title') is not None:
 				draw_track_title(ax, tk.properties['title'])
 
 		if infile_type == 'bigwig' or infile_type == 'bw':
-			if track_configs[i].get('section_name') == None:
+			if track_configs[i].get('section_name') is None:
 				track_configs[i]['section_name'] = 'BigWig'
 			tk = pygtk.BigWigTrack(track_configs[i])
 			tk.plot(ax, region[0], region[1], region[2])
 
-			if tk.properties.get('title') != None:
+			if tk.properties.get('title') is not None:
 				draw_track_title(ax, tk.properties['title'])
 
 		if infile_type == 'gtf':
-			if track_configs[i].get('section_name') == None:
+			if track_configs[i].get('section_name') is None:
 				track_configs[i]['section_name'] = 'Gene'
 			tk = pygtk.GtfTrack(track_configs[i])
 			tk.plot(ax, region[0], region[1], region[2])
 			ax.set_yticks([])
 
-			if tk.properties.get('title') != None:
+			if tk.properties.get('title') is not None:
 				draw_track_title(ax, tk.properties['title'])
 
 		if infile_type == 'bed':
-			if track_configs[i].get('section_name') == None:
+			if track_configs[i].get('section_name') is None:
 				track_configs[i]['section_name'] = 'Bed'
 			elif track_configs[i].get('section_name') == 'clusters':
 
-				if track_configs[i].get('color') == None \
+				if track_configs[i].get('color') is None \
 					or not is_colormap(track_configs[i].get('color')):
 					track_configs[i]['color'] = default_colormap
 
-				if track_configs[i].get('clusters') == None:
+				if track_configs[i].get('clusters') is None:
 					tmp_pd = pd.read_csv(track_configs[i].get('file'), sep="\t", header=None)
 					track_configs[i]['min_value'] = 1
 					track_configs[i]['max_value'] = tmp_pd.iloc[:,4].max()
@@ -154,7 +155,7 @@ def plotting_tracks(region, track_configs, outfig_name, **kwargs):
 					cobar = fig.colorbar(tk.colormap, ax=ax, cax=axins)
 				cobar.ax.yaxis.set_ticks_position('left')
 
-			if tk.properties.get('title') != None:
+			if tk.properties.get('title') is not None:
 				draw_track_title(ax, tk.properties['title'])
 
 	plt.savefig(outfig_name)
@@ -187,7 +188,7 @@ def plotting_circos(circos_configs, outfig_name, **kwargs):
 	color,colormap,colorlist = get_colorlist(circos_configs[0].get('color'), 0, chrom_regions.shape[0]-1)
 
 	for index, row in chrom_regions.iterrows():
-		if color != None:
+		if color is not None:
 			chrom_color = color[index%len(color)]
 		else:
 			chrom_color = colorlist.to_rgba(index)
@@ -197,7 +198,7 @@ def plotting_circos(circos_configs, outfig_name, **kwargs):
 			width=(row['theta_end']-row['theta_start']),
 			bottom=circos_configs[0].get('radius', 0.9)*max(figsize))
 
-	if circos_configs[0].get('cytobands_file') != None:
+	if circos_configs[0].get('cytobands_file') is not None:
 		tmp_pd = pd.read_csv(circos_configs[0].get('cytobands_file'), sep="\t", names=['chrom','start','end','name','gieStain'])
 		cyto_colors = {"gneg":"#FFFFFF","gpos25":"#E5E5E5","gpos50":"#B3B3B3","gpos75":"#666666",
 						"gpos100":"#000000","gvar":"#FFFFFF","stalk":"#CD3333","acen":"#8B2323"}
@@ -228,24 +229,38 @@ def plotting_circos(circos_configs, outfig_name, **kwargs):
 			ticks = get_ticks(row, circos_configs[0].get('tick_unit', 0))
 			ticks_et = row['theta_start']-(ticks-row['start'])/len_per_theta
 			radius = circos_configs[0].get('radius', 0.9)*max(figsize)
-			ax.vlines(ticks_et,
-				[radius]*len(ticks_et),
-				[radius-circos_configs[0].get('tick_length', 0.1)]*len(ticks_et))
+			if circos_configs[0].get('tick_orientation', 'outside') == 'outside':
+				ax.vlines(ticks_et,
+					[radius+circos_configs[0].get('width', 1)]*len(ticks_et),
+					[radius+circos_configs[0].get('width', 1)+circos_configs[0].get('tick_length', 0.1)]*len(ticks_et))
+			elif circos_configs[0].get('tick_orientation', 'outside') == 'inside':
+				ax.vlines(ticks_et,
+					[radius]*len(ticks_et),
+					[radius-circos_configs[0].get('tick_length', 0.1)]*len(ticks_et))
 
-			if circos_configs[0].get('tick_label') != None:
+			if circos_configs[0].get('tick_label') is not None:
 				tick_label = circos_configs[0].get('tick_label')
 				labels = {"":1,"K":1000,"M":1000000,"G":1000000000}
 
 				for i,tick in enumerate(ticks): 
-					label = "{0:.3f}{1}".format(tick/labels[tick_label], tick_label)
+					label = "{0:.2f}{1}".format(tick/labels[tick_label], tick_label)
 					rotation = get_label_rotation(ticks_et[i])
-					ax.text(s=label,
-						x=ticks_et[i],
-						y=radius-circos_configs[0].get('tick_length', 0.1)-circos_configs[0].get('width', 1)-0.2,
-						#fontsize=10,
-						rotation=rotation,
-						ha='center',
-						va='center')
+					if circos_configs[0].get('tick_orientation', 'outside') == 'outside':
+						ax.text(s=label,
+							x=ticks_et[i],
+							y=radius+circos_configs[0].get('width', 1)+circos_configs[0].get('tick_length', 0.1)+0.66,
+							#fontsize=10,
+							rotation=rotation,
+							ha='center',
+							va='center')
+					elif circos_configs[0].get('tick_orientation', 'outside') == 'inside':
+						ax.text(s=label,
+							x=ticks_et[i],
+							y=radius-circos_configs[0].get('tick_length', 0.1)-0.66,
+							#fontsize=10,
+							rotation=rotation,
+							ha='center',
+							va='center')
 
 	for i in range(1, len(circos_configs)):
 		if circos_configs[i].get('type') == 'highlight':
@@ -259,7 +274,7 @@ def plotting_circos(circos_configs, outfig_name, **kwargs):
 				valid,ts,te = get_theta(chrom_regions, row, len_per_theta)
 				if not valid:
 					continue
-				if color != None:
+				if color is not None:
 					bar_color = color[(int(row['score'])-vmin)%len(color)]
 				else:
 					bar_color = colorlist.to_rgba(row['score'])
@@ -276,7 +291,7 @@ def plotting_circos(circos_configs, outfig_name, **kwargs):
 			
 			color,colormap,colorlist = get_colorlist(circos_configs[0].get('color'), 0, chrom_regions.shape[0]-1)
 			for index, row in chrom_regions.iterrows():
-				if color != None:
+				if color is not None:
 					chrom_color = color[index%len(color)]
 				else:
 					chrom_color = colorlist.to_rgba(index)
@@ -291,7 +306,7 @@ def plotting_circos(circos_configs, outfig_name, **kwargs):
 				valid,ts,te = get_theta(chrom_regions, row, len_per_theta)
 				if not valid:
 					continue
-				if color != None:
+				if color is not None:
 					bar_color = color[0]
 				else:
 					bar_color = colorlist.to_rgba(row['score'])
@@ -318,7 +333,7 @@ def plotting_circos(circos_configs, outfig_name, **kwargs):
 
 				if not valid1 or not valid2:
 					continue
-				if color != None:
+				if color is not None:
 					link_color = color[(int(row['score'])-vmin)%len(color)]
 				else:
 					link_color = colorlist.to_rgba(row['score'])
@@ -332,8 +347,22 @@ def plotting_circos(circos_configs, outfig_name, **kwargs):
 				codes = [Path.CURVE3]*len(points)
 				codes[0] = Path.MOVETO
 				path = Path(points, codes)
-				patch = PathPatch(path, facecolor=link_color, edgecolor=link_color)
+				patch = PathPatch(path, facecolor=link_color, edgecolor=link_color, alpha=0.3)
 				ax.add_patch(patch)
+
+		if circos_configs[i].get('type') == 'hic':
+			radius = circos_configs[i].get('radius', 0.5)*max(figsize)
+
+			matrix_c=np.array([[1,2,3],[2,3,4],[4,5,6]])
+			n = matrix_c.shape[0]
+			t = np.array([[1,0.5],[-1,0.5]])
+			A = np.dot(np.array([(i[1],i[0]) for i in itertools.product(range(n,-1,-1),range(0,n+1,1))]),t)
+			X = A[:,1].reshape(n+1,n+1)
+			Y = A[:,0].reshape(n+1,n+1)
+			Y = Y*(circos_configs[i].get('width', 1)/Y.max()) + radius
+			Y[Y<radius] = radius
+			ax.pcolormesh(X,Y,np.flipud(matrix_c))
+
 
 	plt.savefig(outfig_name)
 
@@ -352,7 +381,7 @@ def colormap_to_rbg(colormap, vmin, vmax):
 
 
 def get_colorlist(color_name, vmin, vmax):
-	if color_name != None:
+	if color_name is not None:
 		color = color_name
 		colormap = None
 		colorlist = None
@@ -388,24 +417,49 @@ def is_valid_chrom(chrom_pd):
 	return True
 
 
-def get_chromID(chrom_pd, regions_pd):
+def get_valid_regions(chrom_pd, regions_pd):
+	for index_i, row_i in regions_pd.iterrows():
+		chrom_id = get_chromID(chrom_pd, row_i)
+		if chrom_id == -1:
+			
+
+
+	for index_i, row_i in chrom_pd.iterrows():
+		for index_j, row_j in regions_pd.iterrows():
+			if row_j['chrom'] == row_i['chrom']:
+				if row_j['start'] < row_i['start']:
+					regions_pd.loc[index_j,'start'] = row_i['start']
+				if row_j['end'] > row_i['end']:
+					regions_pd.loc[index_j,'end'] = row_i['end']
+	return region_pd
+
+
+def get_chromID(chrom_pd, region_pd):
 	for index, row in chrom_pd.iterrows():
-		if regions_pd['chrom'] == row['chrom'] \
-			and regions_pd['start'] >= row['start'] \
-			and regions_pd['end'] <= row['end']:
+		if region_pd['chrom'] == row['chrom']:
 			return index
 	return -1
 
 
-def get_theta(chrom_pd, regions_pd, len_per_theta):
-	chromID = get_chromID(chrom_pd, regions_pd)
+def get_theta(chrom_pd, region_pd, len_per_theta):
+	chromID = get_chromID(chrom_pd, region_pd)
 	if chromID == -1:
 		return False,0,0
 	else:
-		ts = chrom_pd.loc[chromID, 'theta_start']-(regions_pd['start']-chrom_pd.loc[chromID, 'start'])/len_per_theta
-		te = chrom_pd.loc[chromID, 'theta_start']-(regions_pd['end']-chrom_pd.loc[chromID, 'start'])/len_per_theta
+		ts = chrom_pd.loc[chromID, 'theta_start']-(region_pd['start']-chrom_pd.loc[chromID, 'start'])/len_per_theta
+		te = chrom_pd.loc[chromID, 'theta_start']-(region_pd['end']-chrom_pd.loc[chromID, 'start'])/len_per_theta
 		return True,ts,te
-	
+
+
+def get_theta_regions(chrom_pd, region_pd, res, len_per_theta):
+	chromID = get_chromID(chrom_pd, region_pd)
+	if chromID == -1:
+		return False,[0]
+	else:
+		ts = chrom_pd.loc[chromID, 'theta_start']-(region_pd['start']-chrom_pd.loc[chromID, 'start']+res/2)/len_per_theta
+
+		return True,ts,te
+
 
 def get_label_rotation(rad):
 	rotation = np.rad2deg(rad)
