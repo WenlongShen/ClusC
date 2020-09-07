@@ -2,6 +2,7 @@
 # coding: utf-8
 
 from clusc.utils import *
+from clusc.parse import *
 
 import pygenometracks.tracks as pygtk
 import matplotlib.pyplot as plt
@@ -163,7 +164,7 @@ def plotting_tracks(region, track_configs, outfig_name, **kwargs):
 
 
 def plotting_circos(circos_configs, outfig_name, **kwargs):
-	figsize=kwargs.get("figsize", (9, 9))
+	figsize = kwargs.get("figsize", (9, 9))
 	fig = plt.figure(figsize=figsize)
 	ax = fig.add_axes([0,0,1,1], polar=True)
 	ax.axis('off')
@@ -200,6 +201,7 @@ def plotting_circos(circos_configs, outfig_name, **kwargs):
 
 	if circos_configs[0].get('cytobands_file') is not None:
 		tmp_pd = pd.read_csv(circos_configs[0].get('cytobands_file'), sep="\t", names=['chrom','start','end','name','gieStain'])
+		tmp_pd = get_valid_regions(chrom_regions, tmp_pd)
 		cyto_colors = {"gneg":"#FFFFFF","gpos25":"#E5E5E5","gpos50":"#B3B3B3","gpos75":"#666666",
 						"gpos100":"#000000","gvar":"#FFFFFF","stalk":"#CD3333","acen":"#8B2323"}
 		for index, row in tmp_pd.iterrows():
@@ -218,7 +220,7 @@ def plotting_circos(circos_configs, outfig_name, **kwargs):
 			rotation = get_label_rotation((row['theta_start']+row['theta_end'])/2)
 			ax.text(s=row['chrom'],
 				x=(row['theta_start']+row['theta_end'])/2,
-				y=circos_configs[0].get('radius', 0.9)*max(figsize)*1.15,
+				y=circos_configs[0].get('radius', 0.9)*max(figsize)*1.12,
 				#fontsize=10,
 				rotation=rotation,
 				ha='center',
@@ -248,7 +250,7 @@ def plotting_circos(circos_configs, outfig_name, **kwargs):
 					if circos_configs[0].get('tick_orientation', 'outside') == 'outside':
 						ax.text(s=label,
 							x=ticks_et[i],
-							y=radius+circos_configs[0].get('width', 1)+circos_configs[0].get('tick_length', 0.1)+0.66,
+							y=radius+circos_configs[0].get('width', 1)+circos_configs[0].get('tick_length', 0.1)+0.2,
 							#fontsize=10,
 							rotation=rotation,
 							ha='center',
@@ -256,7 +258,7 @@ def plotting_circos(circos_configs, outfig_name, **kwargs):
 					elif circos_configs[0].get('tick_orientation', 'outside') == 'inside':
 						ax.text(s=label,
 							x=ticks_et[i],
-							y=radius-circos_configs[0].get('tick_length', 0.1)-0.66,
+							y=radius-circos_configs[0].get('tick_length', 0.1)-0.2,
 							#fontsize=10,
 							rotation=rotation,
 							ha='center',
@@ -265,6 +267,7 @@ def plotting_circos(circos_configs, outfig_name, **kwargs):
 	for i in range(1, len(circos_configs)):
 		if circos_configs[i].get('type') == 'highlight':
 			tmp_pd = pd.read_csv(circos_configs[i].get('file'), sep="\t", names=['chrom','start','end','name','score','strand'])
+			tmp_pd = get_valid_regions(chrom_regions, tmp_pd)
 			vmin = tmp_pd['score'].min()
 			vmax = tmp_pd['score'].max()
 
@@ -287,6 +290,7 @@ def plotting_circos(circos_configs, outfig_name, **kwargs):
 
 		if circos_configs[i].get('type') == 'bar':
 			tmp_pd = pd.read_csv(circos_configs[i].get('file'), sep="\t", names=['chrom','start','end','name','score','strand'])
+			tmp_pd = get_valid_regions(chrom_regions, tmp_pd)
 			tmp_pd['score'] = noramlization_0(tmp_pd['score'])
 			
 			color,colormap,colorlist = get_colorlist(circos_configs[0].get('color'), 0, chrom_regions.shape[0]-1)
@@ -351,17 +355,29 @@ def plotting_circos(circos_configs, outfig_name, **kwargs):
 				ax.add_patch(patch)
 
 		if circos_configs[i].get('type') == 'hic':
-			radius = circos_configs[i].get('radius', 0.5)*max(figsize)
+			tmp_pd = pd.read_csv(circos_configs[i].get('region_file'), sep="\t", names=['chrom','start','end'])
+			tmp_pd = get_valid_regions(chrom_regions, tmp_pd)
+			depth = circos_configs[i].get('depth')/len_per_theta
 
-			matrix_c=np.array([[1,2,3],[2,3,4],[4,5,6]])
-			n = matrix_c.shape[0]
-			t = np.array([[1,0.5],[-1,0.5]])
-			A = np.dot(np.array([(i[1],i[0]) for i in itertools.product(range(n,-1,-1),range(0,n+1,1))]),t)
-			X = A[:,1].reshape(n+1,n+1)
-			Y = A[:,0].reshape(n+1,n+1)
-			Y = Y*(circos_configs[i].get('width', 1)/Y.max()) + radius
-			Y[Y<radius] = radius
-			ax.pcolormesh(X,Y,np.flipud(matrix_c))
+			for index, row in tmp_pd.iterrows():
+				hic_region = (row['chrom'],row['start'],row['end'])
+				hic_matrix = get_hic_matrix(circos_configs[i].get('hic_file'), hic_region)
+				if circos_configs[i].get('transform', 'log1p') == 'log1p':
+					hic_matrix = np.log1p(hic_matrix)
+
+				valid, pos = get_theta_regions(chrom_regions, row, circos_configs[i].get('res'), len_per_theta)
+				t = np.array([[1,0.5],[-1,0.5]])
+				pos_tmp = np.dot(np.array([(i[1],i[0]) for i in itertools.product(pos[::-1],pos)]),t)
+				n = len(pos)
+				
+				X = pos_tmp[:,1].reshape(n,n)
+				Y = pos_tmp[:,0].reshape(n,n)
+				Y[Y<0] = 0
+				Y[Y>depth] = depth
+				Y = noramlization(Y)*circos_configs[i].get('width', 1) + circos_configs[i].get('radius', 0.5)*max(figsize)
+
+				color,colormap,colorlist = get_colorlist(circos_configs[i].get('color'), hic_matrix.min(), hic_matrix.max())
+				ax.pcolormesh(X,Y, np.flipud(hic_matrix), cmap=colormap)
 
 
 	plt.savefig(outfig_name)
@@ -418,20 +434,20 @@ def is_valid_chrom(chrom_pd):
 
 
 def get_valid_regions(chrom_pd, regions_pd):
-	for index_i, row_i in regions_pd.iterrows():
-		chrom_id = get_chromID(chrom_pd, row_i)
-		if chrom_id == -1:
-			
-
-
-	for index_i, row_i in chrom_pd.iterrows():
-		for index_j, row_j in regions_pd.iterrows():
-			if row_j['chrom'] == row_i['chrom']:
-				if row_j['start'] < row_i['start']:
-					regions_pd.loc[index_j,'start'] = row_i['start']
-				if row_j['end'] > row_i['end']:
-					regions_pd.loc[index_j,'end'] = row_i['end']
-	return region_pd
+	# We don't support to transform overlapped regions to seperate regions
+	for index, row in regions_pd.iterrows():
+		chromID = get_chromID(chrom_pd, row)
+		if chromID == -1:
+			regions_pd.drop(index, inplace=True)
+		elif row['start'] < chrom_pd.loc[chromID, 'end'] \
+			and row['end'] > chrom_pd.loc[chromID, 'start']:
+			if row['start'] < chrom_pd.loc[chromID, 'start']:
+				regions_pd.loc[index,'start'] = chrom_pd.loc[chromID, 'start']
+			if row['end'] > chrom_pd.loc[chromID, 'end']:
+				regions_pd.loc[index,'end'] = chrom_pd.loc[chromID, 'end']
+		else:
+			regions_pd.drop(index, inplace=True)
+	return regions_pd
 
 
 def get_chromID(chrom_pd, region_pd):
@@ -454,16 +470,16 @@ def get_theta(chrom_pd, region_pd, len_per_theta):
 def get_theta_regions(chrom_pd, region_pd, res, len_per_theta):
 	chromID = get_chromID(chrom_pd, region_pd)
 	if chromID == -1:
-		return False,[0]
+		return False, [0]
 	else:
-		ts = chrom_pd.loc[chromID, 'theta_start']-(region_pd['start']-chrom_pd.loc[chromID, 'start']+res/2)/len_per_theta
-
-		return True,ts,te
+		ts = chrom_pd.loc[chromID, 'theta_start']-(region_pd['start']-chrom_pd.loc[chromID, 'start'])/len_per_theta
+		te = chrom_pd.loc[chromID, 'theta_start']-(region_pd['end']-chrom_pd.loc[chromID, 'start'])/len_per_theta
+		return True, np.arange(ts,te,-res/len_per_theta)
 
 
 def get_label_rotation(rad):
-	rotation = np.rad2deg(rad)
-	if rotation < -90:
+	rotation = np.rad2deg(rad)-90
+	if rotation < -90 and rotation > -270:
 		rotation += 180
 	return rotation
 
