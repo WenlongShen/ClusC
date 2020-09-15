@@ -5,6 +5,7 @@ from clusc.utils import *
 from clusc.parse import *
 
 import pygenometracks.tracks as pygtk
+import pyBigWig
 import matplotlib.pyplot as plt
 import matplotlib.colors as mc
 import matplotlib.cm as mcm
@@ -16,7 +17,7 @@ import itertools
 
 default_colormap = 'gist_rainbow'
 
-def plotting_tracks(region, track_configs, outfig_name, **kwargs):
+def plot_tracks(region, track_configs, outfig_name, **kwargs):
 	if len(track_configs) < 2:
 		raise Exception("Invalid track numbers... We only accepted more than one track right now...")
 
@@ -163,7 +164,7 @@ def plotting_tracks(region, track_configs, outfig_name, **kwargs):
 
 
 
-def plotting_circos(circos_configs, outfig_name, **kwargs):
+def plot_circos(circos_configs, outfig_name, **kwargs):
 	figsize = kwargs.get("figsize", (9, 9))
 	fig = plt.figure(figsize=figsize)
 	ax = fig.add_axes([0,0,1,1], polar=True)
@@ -211,7 +212,7 @@ def plotting_circos(circos_configs, outfig_name, **kwargs):
 			ax.bar((ts+te)/2,
 				circos_configs[0].get('width', 1),
 				color=cyto_colors[row['gieStain']],
-				alpha=0.3,
+				alpha=0.15,
 				width=(te-ts),
 				bottom=circos_configs[0].get('radius', 0.9)*max(figsize))
 
@@ -321,6 +322,46 @@ def plotting_circos(circos_configs, outfig_name, **kwargs):
 					width=(te-ts),
 					bottom=circos_configs[i].get('radius', 0.6)*max(figsize))
 
+		if circos_configs[i].get('type') == 'bigwig':
+			tmp_pd = pd.read_csv(circos_configs[i].get('region_file'), sep="\t", names=['chrom','start','end'])
+			tmp_pd = get_valid_regions(chrom_regions, tmp_pd)
+			tmp_pd = truncate_regions(tmp_pd, circos_configs[i].get('res'))
+			bw = pyBigWig.open(circos_configs[i].get('file'))
+			
+			color,colormap,colorlist = get_colorlist(circos_configs[0].get('color'), 0, chrom_regions.shape[0]-1)
+			for index, row in chrom_regions.iterrows():
+				if color is not None:
+					chrom_color = color[index%len(color)]
+				else:
+					chrom_color = colorlist.to_rgba(index)
+				ax.bar((row['theta_start']+row['theta_end'])/2,
+					0.01,
+					color=chrom_color,
+					width=(row['theta_end']-row['theta_start']),
+					bottom=circos_configs[i].get('radius', 0.6)*max(figsize))
+
+			color,colormap,colorlist = get_colorlist(circos_configs[i].get('color'), 0, chrom_regions.shape[0]-1)
+			for index, row in tmp_pd.iterrows():
+				if color is not None:
+					scores_color = color[index%len(color)]
+				else:
+					scores_color = colorlist.to_rgba(index)
+
+				valid, pos = get_theta_regions(chrom_regions, row, circos_configs[i].get('res'), len_per_theta)
+				pos_tmp = pos[-1]
+				pos = pos - circos_configs[i].get('res')/2/len_per_theta
+				if pos[-1] < pos_tmp:
+					pos = np.delete(pos, -1)
+				scores = np.array(bw.stats(row['chrom'],row['start'],row['end'], 
+					nBins=int((row['end']-row['start'])/circos_configs[i].get('res')))).astype(float)
+				scores = noramlization(scores)*circos_configs[i].get('width', 1) + circos_configs[i].get('radius', 0.5)*max(figsize)
+				while len(pos)>len(scores):
+					pos = np.delete(pos, -1)
+				ax.fill_between(pos, circos_configs[i].get('radius', 0.5)*max(figsize), scores,
+					linewidth=0.05,
+					color=scores_color,
+					facecolor=scores_color)
+
 		if circos_configs[i].get('type') == 'link':
 			tmp_pd = pd.read_csv(circos_configs[i].get('file'), sep="\t", names=['chrom1','start1','end1','chrom2','start2','end2','score'])
 			vmin = tmp_pd['score'].min()
@@ -361,9 +402,16 @@ def plotting_circos(circos_configs, outfig_name, **kwargs):
 
 			for index, row in tmp_pd.iterrows():
 				hic_region = (row['chrom'],row['start'],row['end'])
-				hic_matrix = get_hic_matrix(circos_configs[i].get('hic_file'), hic_region)
+				hic_matrix = get_hic_matrix(circos_configs[i].get('file'), hic_region)
 				if circos_configs[i].get('transform', 'log1p') == 'log1p':
-					hic_matrix = np.log1p(hic_matrix)
+					hic_matrix += 1
+					norm = mc.LogNorm()
+					vmax = np.percentile(hic_matrix.diagonal(1), 80)
+					vmin = hic_matrix.min()
+				else:
+					norm = None
+					vmax = np.percentile(hic_matrix.diagonal(1), 80)
+					vmin = hic_matrix.min()
 
 				valid, pos = get_theta_regions(chrom_regions, row, circos_configs[i].get('res'), len_per_theta)
 				t = np.array([[1,0.5],[-1,0.5]])
@@ -376,8 +424,12 @@ def plotting_circos(circos_configs, outfig_name, **kwargs):
 				Y[Y>depth] = depth
 				Y = noramlization(Y)*circos_configs[i].get('width', 1) + circos_configs[i].get('radius', 0.5)*max(figsize)
 
-				color,colormap,colorlist = get_colorlist(circos_configs[i].get('color'), hic_matrix.min(), hic_matrix.max())
-				ax.pcolormesh(X,Y, np.flipud(hic_matrix), cmap=colormap)
+				color,colormap,colorlist = get_colorlist(circos_configs[i].get('color'), vmin, vmax)
+				ax.pcolormesh(X,Y, np.flipud(hic_matrix), 
+					cmap=colormap,
+					vmin=vmin,
+					vmax=vmax, 
+					norm=norm)
 
 
 	plt.savefig(outfig_name)
@@ -450,6 +502,13 @@ def get_valid_regions(chrom_pd, regions_pd):
 	return regions_pd
 
 
+def truncate_regions(regions_pd, res):
+	for index, row in regions_pd.iterrows():
+		tmp = (row['end']-row['start']) % res
+		regions_pd.loc[index,'end'] = row['end'] - ((row['end']-row['start']) % res)
+	return regions_pd
+
+
 def get_chromID(chrom_pd, region_pd):
 	for index, row in chrom_pd.iterrows():
 		if region_pd['chrom'] == row['chrom']:
@@ -468,13 +527,11 @@ def get_theta(chrom_pd, region_pd, len_per_theta):
 
 
 def get_theta_regions(chrom_pd, region_pd, res, len_per_theta):
-	chromID = get_chromID(chrom_pd, region_pd)
-	if chromID == -1:
-		return False, [0]
-	else:
-		ts = chrom_pd.loc[chromID, 'theta_start']-(region_pd['start']-chrom_pd.loc[chromID, 'start'])/len_per_theta
-		te = chrom_pd.loc[chromID, 'theta_start']-(region_pd['end']-chrom_pd.loc[chromID, 'start'])/len_per_theta
-		return True, np.arange(ts,te,-res/len_per_theta)
+	valid,ts,te = get_theta(chrom_pd, region_pd, len_per_theta)
+	pos = np.arange(ts, te, -res/len_per_theta)
+	if len(pos) != int((region_pd['end']-region_pd['start'])/res)+1:
+		pos = np.append(pos, te)
+	return valid, pos
 
 
 def get_label_rotation(rad):
