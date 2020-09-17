@@ -21,7 +21,7 @@ def plot_tracks(region, track_configs, outfig_name, **kwargs):
 	if len(track_configs) < 2:
 		raise Exception("Invalid track numbers... We only accepted more than one track right now...")
 
-	figsize=kwargs.get("figsize", (12, 9))
+	figsize=kwargs.get("figsize", (16, 9))
 	fig, axs = plt.subplots(len(track_configs), 1, sharex='col', figsize=figsize)
 	plt.subplots_adjust(left=0.1, right=0.8, bottom=0.1, top=0.9)
 
@@ -431,6 +431,14 @@ def plot_circos(circos_configs, outfig_name, **kwargs):
 					vmax=vmax, 
 					norm=norm)
 
+	plt.savefig(outfig_name)
+
+
+def plot_heatmap(config, outfig_name, **kwargs):
+	figsize = kwargs.get("figsize", (16, 9))
+	fig = plt.figure(figsize=figsize)
+	ax = fig.add_axes([0,0,1,1])
+	ax.axis('off')
 
 	plt.savefig(outfig_name)
 

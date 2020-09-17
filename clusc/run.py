@@ -27,6 +27,8 @@ def embedding(data, n_clusters, algorithm="arga", **kwargs):
 		sess.run(tf.global_variables_initializer())
 		for epoch in range(epochs):
 			emb, avg_cost = update(ae_model, opt, sess, data['adj_norm'], data['adj_label'], data['features'], placeholders, data['adj'])
-
 	return emb
 
+
+def motifs_finding(algorithm="cnn", **kwargs):
+	return None

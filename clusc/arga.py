@@ -4,7 +4,6 @@
 from clusc.utils import *
 import os
 
-import numpy as np
 import tensorflow as tf
 import scipy.sparse as sp
 
